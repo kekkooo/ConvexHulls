@@ -2,21 +2,12 @@
 #define CONVEXHULLCREATOR_H
 
 #include <Eigen/Dense>
-//#include <CGAL/Exact_integer.h>
-//#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-//#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
-//#include <CGAL/Exact_integer.h>
-//#include <CGAL/Homogeneous.h>
-//#include <CGAL/Polyhedron_items_with_id_3.h>
-//#include <CGAL/algorithm.h>
-//#include <CGAL/Polyhedron_3.h>
-//#include <CGAL/convex_hull_3.h>
-//#include <CGAL/Nef_polyhedron_3.h>
-
 #include <commontypedefs.h>
 #include <segmentation.h>
 
 namespace ConvexHullCreator{
+
+    typedef std::map< size_t, std::vector<CGAL_Point_3> > SegmentedPointList;
 
     // TODO :
     // I'm building the bounding boxes using the exact constructions,
@@ -29,16 +20,16 @@ namespace ConvexHullCreator{
 
     void getConvexHull(         Eigen::MatrixXd& points_in, Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out );
 
-    void getConvexHull(         Eigen::MatrixXd& points_in, const Segmentation::Segments& s,
+    void getConvexHull(Eigen::MatrixXd& points_in, const Segmentation::Segments& segments,
                                 Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out );
 
-    void getConvexHullUnion(    Eigen::MatrixXd& points_in, const Segmentation::Segments& s,
+    void getConvexHullUnion(Eigen::MatrixXd& points_in, const Segmentation::Segments& segments,
                                 Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out );
 
     void getOOBs(               Eigen::MatrixXd& points_in, const Segmentation::Segments& s,
                                 Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out );
 
-    void remesh(                Double_Polyhedron_3 &in);
+    void remesh(Double_Polyhedron_3 &in, double target_edge_length = 1.0 );
 
     void toInexactPolyhedron(   Polyhedron_3& in , Double_Polyhedron_3 &out);
 

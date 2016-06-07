@@ -8,7 +8,7 @@ void Segmentation::buildSegmentedPointsList( Eigen::MatrixXd &points_in, const S
     for( const auto& item : segments ){
         std::vector<CGAL_Point_3> points;
         for( size_t i : item.second ){
-            std::cout << "adding point " << i;
+//            std::cout << "adding point " << i;
             points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
     //            std::cout << " = " << points.back() << std::endl;
         }
@@ -37,7 +37,7 @@ void Segmentation::loadSegments( std::string filename, Segmentation::Segments &s
             segments[segid] = std::set<size_t>();
         }
         segments[segid].insert( vid );
-        std::cout << vid << " " << segid << std::endl;
+//        std::cout << vid << " " << segid << std::endl;
     }
     infile.close();
 }
@@ -50,7 +50,7 @@ void Segmentation::joinSegments(Segmentation::Segments &segments, Eigen::MatrixX
     // create vertex to segment correspondance
     for( const auto&  item : segments ){
         for( size_t vid : item.second ){
-            std::cout << "vertex " << vid << " maps to segment " << item.first << std::endl;
+//            std::cout << "vertex " << vid << " maps to segment " << item.first << std::endl;
             vert_to_segment[vid] = item.first;
         }
     }

@@ -1,55 +1,109 @@
 #include "convexhullcreator.h"
 #include <chrono>
 
+#include <CGAL/Polygon_mesh_processing/remesh.h>
 #include <CGAL/Polygon_mesh_processing/refine.h>
 #include <CGAL/Polygon_mesh_processing/fair.h>
 
 #include <polyhedron_converter.h>
-#include <obb.h>
 
 typedef std::chrono::high_resolution_clock myclock;
+
+void buildCGALPoints( const Eigen::MatrixXd &points_in, std::vector<CGAL_Point_3>& points_out ){
+    for( long i = 0; i < points_in.rows(); ++i ){
+        points_out.push_back(( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )) ));
+    }
+}
+
+void PolyhedronToDenseVertexMatrix( Polyhedron_3& poly, Eigen::MatrixXd& points_out ){
+    size_t no_vertices = poly.size_of_vertices();
+    points_out.resize( no_vertices, 3 );
+
+    size_t vertexId = 0;
+    for( auto vertexIterator = poly.vertices_begin(); vertexIterator != poly.vertices_end(); ++vertexIterator, ++vertexId ){
+        vertexIterator->id() = vertexId;
+        points_out.row(vertexId) <<  CGAL::to_double( (*vertexIterator).point().x()),
+                                CGAL::to_double( (*vertexIterator).point().y()),
+                                CGAL::to_double( (*vertexIterator).point().z());
+    }
+}
+
+void PolyhedronToDenseFacesMatrix( Polyhedron_3& poly, Eigen::MatrixXi& faces_out ){
+    size_t no_faces    = poly.size_of_facets();
+    faces_out.resize(  no_faces, 3 );
+
+    size_t faceId = 0;
+    for( auto faceIterator = poly.facets_begin(); faceIterator != poly.facets_end(); ++faceIterator, ++faceId ){
+        assert( faceIterator->is_triangle());
+        auto faceVertexIterator = (*faceIterator).facet_begin();
+        size_t v0 = faceVertexIterator->vertex()->id();      ++faceVertexIterator;
+        size_t v1 = faceVertexIterator->vertex()->id();      ++faceVertexIterator;
+        size_t v2 = faceVertexIterator->vertex()->id();      ++faceVertexIterator;
+        assert( faceVertexIterator  == (*faceIterator).facet_begin( ));
+//        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
+        faces_out.row( faceId ) << v0, v1, v2;
+    }
+}
+
+void PolyhedronToDenseMatrices( Polyhedron_3& poly, Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out ){
+    PolyhedronToDenseVertexMatrix( poly, points_out );
+    PolyhedronToDenseFacesMatrix( poly, faces_out );
+}
+
+void BuildSegmentedPointList( const Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                              ConvexHullCreator::SegmentedPointList& segmentedPoints ){
+    // build the segmented list of points
+    for( const auto& item : segments ){
+        std::vector<CGAL_Point_3> points;
+        for( size_t id : item.second ){
+            points.push_back( CGAL_Point_3( points_in( id, 0 ), points_in( id, 1 ), points_in( id, 2 )));
+        }
+        segmentedPoints[item.first] = std::move( points );
+    }
+}
+
 
 
 void ConvexHullCreator::getConvexHull( Eigen::MatrixXd &points_in,
                                        Eigen::MatrixXd &points_out,
                                        Eigen::MatrixXi &faces_out){
-
     auto t0 = myclock::now();
 
     Polyhedron_3 hull;
     std::vector<CGAL_Point_3> points( points_in.rows( ));
-    for( long i = 0; i < points_in.rows(); ++i ){
-        points.push_back(( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )) ));
-    }
+    buildCGALPoints( points_in, points );
 
-    CGAL::convex_hull_3( points.begin(), points.end(), hull );
 
-    size_t no_vertices = hull.size_of_vertices();
-    size_t no_faces    = hull.size_of_facets();
+//    std::vector<CGAL_Point_3> points( points_in.rows( ));
+//    for( long i = 0; i < points_in.rows(); ++i ){
+//        points.push_back(( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )) ));
+//    }
 
-    points_out.resize( no_vertices, 3 );
-    faces_out.resize(  no_faces, 3 );
+    CGAL::convex_hull_3( points.begin(), points.end(), hull );    
 
-    size_t vid = 0;
-    for( Polyhedron_3::Vertex_iterator vit = hull.vertices_begin(); vit != hull.vertices_end(); ++vit, ++vid ){
-        vit->id() = vid;
-        points_out.row(vid) <<  CGAL::to_double( (*vit).point().x()),
-                                CGAL::to_double( (*vit).point().y()),
-                                CGAL::to_double( (*vit).point().z());
-    }
+    PolyhedronToDenseMatrices( hull, points_out, faces_out );
+
+//    size_t vid = 0;
+//    for( Polyhedron_3::Vertex_iterator vit = hull.vertices_begin(); vit != hull.vertices_end(); ++vit, ++vid ){
+//        vit->id() = vid;
+//        points_out.row(vid) <<  CGAL::to_double( (*vit).point().x()),
+//                                CGAL::to_double( (*vit).point().y()),
+//                                CGAL::to_double( (*vit).point().z());
+//    }
+
 //    std::cout << "points added " << no_vertices << std::endl;
 
-    size_t fid = 0;
-    for( auto fit = hull.facets_begin(); fit != hull.facets_end(); ++fit, ++fid ){
-        assert( fit->is_triangle());
-        auto h = (*fit).facet_begin();
-        size_t v0 = h->vertex()->id();      ++h;
-        size_t v1 = h->vertex()->id();      ++h;
-        size_t v2 = h->vertex()->id();      ++h;
-        assert( h  == (*fit).facet_begin( ));
-//        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
-        faces_out.row(fid) << v0, v1, v2;
-    }
+//    size_t fid = 0;
+//    for( auto fit = hull.facets_begin(); fit != hull.facets_end(); ++fit, ++fid ){
+//        assert( fit->is_triangle());
+//        auto h = (*fit).facet_begin();
+//        size_t v0 = h->vertex()->id();      ++h;
+//        size_t v1 = h->vertex()->id();      ++h;
+//        size_t v2 = h->vertex()->id();      ++h;
+//        assert( h  == (*fit).facet_begin( ));
+////        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
+//        faces_out.row(fid) << v0, v1, v2;
+//    }
 
     auto t3  = myclock::now();
     long span4 = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t0).count();
@@ -57,25 +111,26 @@ void ConvexHullCreator::getConvexHull( Eigen::MatrixXd &points_in,
 
 }
 
-void ConvexHullCreator::getConvexHull( Eigen::MatrixXd &points_in, const Segmentation::Segments &s,
+void ConvexHullCreator::getConvexHull( Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
                                        Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
     auto t0 = myclock::now();
 
-    size_t no_segments = s.size();
-    std::vector<Polyhedron_3>                     hulls( no_segments );
-    std::map< size_t, std::vector<CGAL_Point_3> >   seg_points;
-    std::vector<CGAL_Point_3>                       points( points_in.rows( ));
+    size_t no_segments = segments.size();
+    std::vector<Polyhedron_3>   hulls( no_segments );
+    SegmentedPointList          seg_points;
 
-    // build the segmented list of points
-    for( const auto& item : s ){
-        std::vector<CGAL_Point_3> points;
-        for( size_t i : item.second ){
-//            std::cout << "adding point " << i;
-            points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
-//            std::cout << " = " << points.back() << std::endl;
-        }
-        seg_points[item.first] = std::move( points );
-    }
+    BuildSegmentedPointList( points_in, segments, seg_points );
+
+//    // build the segmented list of points
+//    for( const auto& item : segments ){
+//        std::vector<CGAL_Point_3> points;
+//        for( size_t i : item.second ){
+////            std::cout << "adding point " << i;
+//            points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
+////            std::cout << " = " << points.back() << std::endl;
+//        }
+//        seg_points[item.first] = std::move( points );
+//    }
 
     // build the convex_hulls
     for( const auto& item : seg_points ){
@@ -128,27 +183,29 @@ void ConvexHullCreator::getConvexHull( Eigen::MatrixXd &points_in, const Segment
     std::cout << "all process took " << span << "millis" << std::endl;
 }
 
-void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Segmentation::Segments &s,
-                                            Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                                            Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out ){
     auto t0 = myclock::now();
 
     size_t no_segments = s.size();
     std::vector<Polyhedron_3_no_id>                 hulls( no_segments );
     std::vector<Nef_Polyhedron_3>                   nef_hulls;
     std::map< size_t, std::vector<CGAL_Point_3> >   seg_points;
-    std::vector<CGAL_Point_3>                       points( points_in.rows( ));
+//    std::vector<CGAL_Point_3>                       points( points_in.rows( ));
 
 
-    // build the segmented list of points
-    for( const auto& item : s ){
-        std::vector<CGAL_Point_3> points;
-        for( size_t i : item.second ){
-//            std::cout << "adding point " << i;
-            points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
-//            std::cout << " = " << points.back() << std::endl;
-        }
-        seg_points[item.first] = std::move( points );
-    }
+    BuildSegmentedPointList( points_in, segments, seg_points );
+
+//    // build the segmented list of points
+//    for( const auto& item : s ){
+//        std::vector<CGAL_Point_3> points;
+//        for( size_t i : item.second ){
+////            std::cout << "adding point " << i;
+//            points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
+////            std::cout << " = " << points.back() << std::endl;
+//        }
+//        seg_points[item.first] = std::move( points );
+//    }
 
     auto ta0 = myclock::now();
     // build the convex_hulls
@@ -161,7 +218,6 @@ void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Se
         CGAL::convex_hull_3( points.begin(), points.end(), hull );
 
         if( hull.is_closed() ){
-//            Nef_Polyhedron_3 nef_hull(Nef_Polyhedron_3::EMPTY);
             hulls.push_back( hull );
             Nef_Polyhedron_3 nef_hull( hull );
             nef_hulls.push_back( nef_hull );
@@ -195,37 +251,41 @@ void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Se
 
     }
     nef_union.convert_to_Polyhedron( exact_convex_union );
-
+    std::cout << "union hull converted to polyhedron " << std::endl;
     toInexactPolyhedron( exact_convex_union, convex_union );
-//    remesh( convex_union );
+    std::cout << "union hull converted to inexact polyhedron " << std::endl;
+    remesh( convex_union, 10.0 );
+    std::cout << "remeshed " << std::endl;
 
-    // Build the union of the convex hulls
-    size_t no_vertices = convex_union.size_of_vertices();
-    size_t no_faces    = convex_union.size_of_facets();
+    PolyhedronToDenseMatrices(convex_union, points_out, faces_out );
 
-    points_out.resize( no_vertices, 3 );
-    faces_out.resize(  no_faces, 3 );
+//    // Build the union of the convex hulls
+//    size_t no_vertices = convex_union.size_of_vertices();
+//    size_t no_faces    = convex_union.size_of_facets();
 
-    size_t vid = 0;
-    for( Double_Polyhedron_3::Vertex_iterator vit = convex_union.vertices_begin(); vit != convex_union.vertices_end(); ++vit, ++vid ){
-        vit->id() = vid;
-        points_out.row(vid) <<  (*vit).point().x(),
-                                (*vit).point().y(),
-                                (*vit).point().z();
-    }
-//    std::cout << "points added " << no_vertices << std::endl;
+//    points_out.resize( no_vertices, 3 );
+//    faces_out.resize(  no_faces, 3 );
 
-    size_t fid = 0;
-    for( auto fit = convex_union.facets_begin(); fit != convex_union.facets_end(); ++fit, ++fid ){
-        assert( fit->is_triangle());
-        auto h = (*fit).facet_begin();
-        size_t v0 = h->vertex()->id();      ++h;
-        size_t v1 = h->vertex()->id();      ++h;
-        size_t v2 = h->vertex()->id();      ++h;
-        assert( h  == (*fit).facet_begin( ));
-//        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
-        faces_out.row(fid) << v0, v1, v2;
-    }
+//    size_t vid = 0;
+//    for( Double_Polyhedron_3::Vertex_iterator vit = convex_union.vertices_begin(); vit != convex_union.vertices_end(); ++vit, ++vid ){
+//        vit->id() = vid;
+//        points_out.row(vid) <<  (*vit).point().x(),
+//                                (*vit).point().y(),
+//                                (*vit).point().z();
+//    }
+////    std::cout << "points added " << no_vertices << std::endl;
+
+//    size_t fid = 0;
+//    for( auto fit = convex_union.facets_begin(); fit != convex_union.facets_end(); ++fit, ++fid ){
+//        assert( fit->is_triangle());
+//        auto h = (*fit).facet_begin();
+//        size_t v0 = h->vertex()->id();      ++h;
+//        size_t v1 = h->vertex()->id();      ++h;
+//        size_t v2 = h->vertex()->id();      ++h;
+//        assert( h  == (*fit).facet_begin( ));
+////        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
+//        faces_out.row(fid) << v0, v1, v2;
+//    }
 
     auto t1  = myclock::now();
     long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
@@ -233,17 +293,26 @@ void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Se
 
 }
 
-void ConvexHullCreator::remesh(Double_Polyhedron_3& in ){
+void ConvexHullCreator::remesh(Double_Polyhedron_3& in, double target_edge_length ){
 
-    std::vector<Double_Polyhedron_3::Facet_handle> new_facets;
-    std::vector<Double_Polyhedron_3::Vertex_handle> new_verts;
+    std::cout << "trying to remesh " << std::endl;
+    std::cout << "a polygon of " << in.size_of_vertices() << " vertices and "
+                                 << in.size_of_facets() << "faces " << std::endl;
+//    std::vector<Double_Polyhedron_3::Facet_handle> new_facets;
+//    std::vector<Double_Polyhedron_3::Vertex_handle> new_verts;
 
+    std::cout << in.size_of_vertices();
 
-    CGAL::Polygon_mesh_processing::refine( in,
-                                           faces(in),
-                                           std::back_inserter(new_facets),
-                                           std::back_inserter(new_verts),
-                                           CGAL::Polygon_mesh_processing::parameters::density_control_factor(3.0));
+    CGAL::Polygon_mesh_processing::split_long_edges( edges(in), 10.0, in);
+    std::cout << "split long edeges done" << std::endl;
+    CGAL::Polygon_mesh_processing::isotropic_remeshing( faces(in), 10.0, in,
+                                                        CGAL::Polygon_mesh_processing::parameters::protect_constraints(true));
+
+//    CGAL::Polygon_mesh_processing::refine( in,
+//                                           faces(in),
+//                                           std::back_inserter(new_facets),
+//                                           std::back_inserter(new_verts),
+//                                           CGAL::Polygon_mesh_processing::parameters::density_control_factor(3.0));
 ////    CGAL::Polygon_mesh_processing::fair()
 }
 
@@ -306,71 +375,71 @@ void ConvexHullCreator::getConvexHulls( Eigen::MatrixXd &points_in, const Segmen
 
 }
 
-void ConvexHullCreator::getOOBs( Eigen::MatrixXd &points_in, const Segmentation::Segments &s,
-                                 Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+//void ConvexHullCreator::getOOBs( Eigen::MatrixXd &points_in, const Segmentation::Segments &s,
+//                                 Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
 
-    auto t0 = myclock::now();
+//    auto t0 = myclock::now();
 
-    size_t no_segments = s.size();
-    std::vector<Polyhedron_3>                       hulls( no_segments );
-    std::map< size_t, std::vector<CGAL_Point_3> >   seg_points;
+//    size_t no_segments = s.size();
+//    std::vector<Polyhedron_3>                       hulls( no_segments );
+//    std::map< size_t, std::vector<CGAL_Point_3> >   seg_points;
 
-    std::cout << "there are " << no_segments << " segments " << std::endl;
-    Segmentation::buildSegmentedPointsList( points_in, s, seg_points );
+//    std::cout << "there are " << no_segments << " segments " << std::endl;
+//    Segmentation::buildSegmentedPointsList( points_in, s, seg_points );
 
-    buildConvexHulls( seg_points, hulls );
+//    buildConvexHulls( seg_points, hulls );
 
-    size_t ov = 0, of = 0;
-    points_out.resize( no_segments * 8, 3 );
-    faces_out.resize(    no_segments * 6, 4 );
-    for( auto& hull : hulls ){
-        Eigen::MatrixXd v( 8, 3 );
-        Eigen::MatrixXi f( 6, 4 );
+//    size_t ov = 0, of = 0;
+//    points_out.resize( no_segments * 8, 3 );
+//    faces_out.resize(    no_segments * 6, 4 );
+//    for( auto& hull : hulls ){
+//        Eigen::MatrixXd v( 8, 3 );
+//        Eigen::MatrixXi f( 6, 4 );
 
-        Eigen::MatrixXd hv( hull.size_of_vertices(), 3 );
-        Eigen::MatrixXi hf( hull.size_of_facets(), 3 );
+//        Eigen::MatrixXd hv( hull.size_of_vertices(), 3 );
+//        Eigen::MatrixXi hf( hull.size_of_facets(), 3 );
 
-        size_t vid = 0, fid = 0;
-        for( Polyhedron_3::Vertex_iterator vit = hull.vertices_begin(); vit != hull.vertices_end(); ++vit, ++vid ){
-            vit->id() = vid;
-            hv.row(vid) <<  CGAL::to_double( (*vit).point().x( )),
-                            CGAL::to_double( (*vit).point().y( )),
-                            CGAL::to_double( (*vit).point().z( ));
-        }
+//        size_t vid = 0, fid = 0;
+//        for( Polyhedron_3::Vertex_iterator vit = hull.vertices_begin(); vit != hull.vertices_end(); ++vit, ++vid ){
+//            vit->id() = vid;
+//            hv.row(vid) <<  CGAL::to_double( (*vit).point().x( )),
+//                            CGAL::to_double( (*vit).point().y( )),
+//                            CGAL::to_double( (*vit).point().z( ));
+//        }
 
-        for( auto fit = hull.facets_begin(); fit != hull.facets_end(); ++fit, ++fid ){
-            assert( fit->is_triangle());
-            auto h = (*fit).facet_begin();
-            size_t v0 = h->vertex()->id();      ++h;
-            size_t v1 = h->vertex()->id();      ++h;
-            size_t v2 = h->vertex()->id();      ++h;
-            assert( h  == (*fit).facet_begin( ));
-    //        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
-            hf.row( fid ) << v0, v1, v2;
-        }
+//        for( auto fit = hull.facets_begin(); fit != hull.facets_end(); ++fit, ++fid ){
+//            assert( fit->is_triangle());
+//            auto h = (*fit).facet_begin();
+//            size_t v0 = h->vertex()->id();      ++h;
+//            size_t v1 = h->vertex()->id();      ++h;
+//            size_t v2 = h->vertex()->id();      ++h;
+//            assert( h  == (*fit).facet_begin( ));
+//    //        std::cout << fid << ") " << v0 << ", " << v1 << ", " << v2 << std::endl;
+//            hf.row( fid ) << v0, v1, v2;
+//        }
 
-        OBB::buildOBB( hv, hf, v, f );
+//        OBB::buildOBB( hv, hf, v, f );
 
-        size_t offset = ov;
-        points_out.row( ov++ ) = v.row( 0 );  points_out.row( ov++ ) = v.row( 1 );
-        points_out.row( ov++ ) = v.row( 2 );  points_out.row( ov++ ) = v.row( 3 );
-        points_out.row( ov++ ) = v.row( 4 );  points_out.row( ov++ ) = v.row( 5 );
-        points_out.row( ov++ ) = v.row( 6 );  points_out.row( ov++ ) = v.row( 7 );
+//        size_t offset = ov;
+//        points_out.row( ov++ ) = v.row( 0 );  points_out.row( ov++ ) = v.row( 1 );
+//        points_out.row( ov++ ) = v.row( 2 );  points_out.row( ov++ ) = v.row( 3 );
+//        points_out.row( ov++ ) = v.row( 4 );  points_out.row( ov++ ) = v.row( 5 );
+//        points_out.row( ov++ ) = v.row( 6 );  points_out.row( ov++ ) = v.row( 7 );
 
-        f = f.array() + offset;
+//        f = f.array() + offset;
 
-        faces_out.row( of++ ) = f.row( 0 ); faces_out.row( of++ ) = f.row(1);
-        faces_out.row( of++ ) = f.row( 2 ); faces_out.row( of++ ) = f.row(3);
-        faces_out.row( of++ ) = f.row( 4 ); faces_out.row( of++ ) = f.row(5);
-    }
+//        faces_out.row( of++ ) = f.row( 0 ); faces_out.row( of++ ) = f.row(1);
+//        faces_out.row( of++ ) = f.row( 2 ); faces_out.row( of++ ) = f.row(3);
+//        faces_out.row( of++ ) = f.row( 4 ); faces_out.row( of++ ) = f.row(5);
+//    }
 
-    assert( ov == points_out.rows() );
-    assert( of == faces_out.rows() );
+//    assert( ov == points_out.rows() );
+//    assert( of == faces_out.rows() );
 
-    auto t1  = myclock::now();
-    long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-    std::cout << "all process took " << span << "millis" << std::endl;
-}
+//    auto t1  = myclock::now();
+//    long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+//    std::cout << "all process took " << span << "millis" << std::endl;
+//}
 
 void ConvexHullCreator::buildConvexHulls( const Segmentation::SegmentedPointList &seg_points,
                                           std::vector<Polyhedron_3> &hulls){
