@@ -27,9 +27,12 @@
 #include <convexhullcreator.h>
 #include <segmentation.h>
 #include <common_paths.h>
+#include <iglmeshboolean.h>
 
 using namespace Eigen;
 using namespace std;
+
+typedef std::chrono::high_resolution_clock myclock;
 
 // trimesh
 Eigen::MatrixXd VT;
@@ -46,7 +49,7 @@ Eigen::MatrixXd PQC0, PQC1, PQC2, PQC3; // quad edges
 
 igl::viewer::Viewer viewer;
 
-#define ASURA
+#define DANA
 //#define SAVE_PARTS
 
 #ifdef CAPSULE
@@ -59,7 +62,7 @@ igl::viewer::Viewer viewer;
     PathsStruct current_model = CommonPaths::hand;
 #endif
 #ifdef DANA
-    PathsStruct current_model = CommonPaths::dana;
+    PathsStruct current_model = CommonPaths::getDana();
 #endif
 #ifdef JEFF
      PathsStruct current_model = CommonPaths::getJeff();
@@ -87,7 +90,6 @@ void setOOBs( ){
     viewer.data.add_edges( PQC2, PQC3, Eigen::RowVector3d( 0, 0, 0 ));
     viewer.data.add_edges( PQC3, PQC0, Eigen::RowVector3d( 0, 0, 0 ));
 }
-
 
 int main(int argc, char *argv[]){
 
@@ -120,14 +122,30 @@ int main(int argc, char *argv[]){
 #ifdef SAVE_PARTS
             saveParts( seg );
 #endif
-
             igl::writeOBJ( current_model.mesh_to_save, VH, FH);
             convexhull_available = true;
             break;
         }
+        case 'b':
+        case 'B':{
+            std::cout << "IGL::mesh_boolean approach" << std::endl;
+            auto t0 = myclock::now();
+
+            //iglMeshBoolean::getConvexHullUnion(VT, seg, VH, FH );
+            iglMeshBoolean::getConvexHullUnion_mt(VT, seg, VH, FH );
+
+            auto t1  = myclock::now();
+            long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+            std::cout << "whole process took " << span << "millis" << std::endl;
+
+            igl::writeOBJ( current_model.mesh_to_save, VH, FH);
+            convexhull_available = true;
+
+            break;
+        }
         case 'i':
         case 'I':{
-            std::cout << "IGL::CsgTree approach" << std::endl;
+            std::cout << "IGL::CsgTree approach" << std::endl;            
             break;
         }
         case 'k':

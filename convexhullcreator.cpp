@@ -189,18 +189,31 @@ void ConvexHullCreator::toInexactPolyhedron( Polyhedron_3 &in, Double_Polyhedron
     poly_copy<Double_Polyhedron_3, Polyhedron_3>( out, in );
 }
 
-void ConvexHullCreator::getConvexHulls( Eigen::MatrixXd &points_in, const Segmentation::Segments& s,
+void ConvexHullCreator::getConvexHulls( Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
                                         std::vector<Eigen::MatrixXd> &points_out,
                                         std::vector<Eigen::MatrixXi> &faces_out){
     auto t0 = myclock::now();
 
-    size_t no_segments = s.size();
+    size_t no_segments = segments.size();
     std::vector<Polyhedron_3>                       hulls( no_segments );
     std::map< size_t, std::vector<CGAL_Point_3> >   seg_points;
 
     std::cout << "there are " << no_segments << " segments " << std::endl;
-    Segmentation::buildSegmentedPointsList( points_in, s, seg_points );
+    Segmentation::buildSegmentedPointsList( points_in, segments, seg_points );
 
+
+    buildConvexHulls( seg_points, hulls );
+    points_out.reserve( no_segments );
+    faces_out.reserve( no_segments );
+    for( auto& hull : hulls ){
+        Eigen::MatrixXd vertices( hull.size_of_vertices(), 3 );
+        Eigen::MatrixXi faces( hull.size_of_facets(), 3 );
+        Utilities::PolyhedronToDenseMatrices(hull, vertices, faces );
+        points_out.push_back(vertices);
+        faces_out.push_back(faces);
+    }
+
+    /*
     // build the convex_hulls
     for( const auto& item : seg_points ){
         std::cout << "building convex hull for segment " << item.first << std::endl;
@@ -241,6 +254,7 @@ void ConvexHullCreator::getConvexHulls( Eigen::MatrixXd &points_in, const Segmen
     auto t1  = myclock::now();
     long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
     std::cout << "all process took " << span << "millis" << std::endl;
+    */
 }
 
 void ConvexHullCreator::buildConvexHulls( const Segmentation::SegmentedPointList &seg_points,

@@ -51,7 +51,9 @@ SOURCES += main.cpp \
     segmentation.cpp \
     common_paths.cpp \
     iglconvexhullunion.cpp \
-    cgal_to_eigen.cpp
+    cgal_to_eigen.cpp \
+    csg_tree_approach.cpp \
+    iglmeshboolean.cpp
 
 HEADERS += \
     convexhullcreator.h \
@@ -60,4 +62,6 @@ HEADERS += \
     commontypedefs.h \
     common_paths.h \
     iglconvexhullunion.h \
-    cgal_to_eigen.h
+    cgal_to_eigen.h \
+    csg_tree_approach.h \
+    iglmeshboolean.h

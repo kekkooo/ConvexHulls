@@ -15,7 +15,7 @@ namespace ConvexHullCreator{
 
     void buildConvexHulls(const Segmentation::SegmentedPointList& points, std::vector< Polyhedron_3>& hulls );
 
-    void getConvexHulls(        Eigen::MatrixXd& points_in, const Segmentation::Segments& s,
+    void getConvexHulls(Eigen::MatrixXd& points_in, const Segmentation::Segments& segments,
                                 std::vector<Eigen::MatrixXd>& points_out, std::vector<Eigen::MatrixXi>& faces_out );
 
     void getConvexHull(         Eigen::MatrixXd& points_in, Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out );
