@@ -8,9 +8,7 @@ void Segmentation::buildSegmentedPointsList( Eigen::MatrixXd &points_in, const S
     for( const auto& item : segments ){
         std::vector<CGAL_Point_3> points;
         for( size_t i : item.second ){
-//            std::cout << "adding point " << i;
             points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
-    //            std::cout << " = " << points.back() << std::endl;
         }
         segmentedPointList[item.first] = std::move( points );
     }

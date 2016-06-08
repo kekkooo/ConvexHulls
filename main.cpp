@@ -62,7 +62,7 @@ igl::viewer::Viewer viewer;
     PathsStruct current_model = CommonPaths::dana;
 #endif
 #ifdef JEFF
-     PathsStructcurrent_model = CommonPaths::jeff;
+     PathsStruct current_model = CommonPaths::getJeff();
 #endif
 
 void saveParts( const Segmentation::Segments& seg ){
@@ -97,7 +97,7 @@ int main(int argc, char *argv[]){
               << current_model.segmentation << std::endl;
 
 
-    igl::readOBJ( current_model.mesh_to_load , VT, FT );
+    igl::readOBJ( current_model.mesh_to_load , VT, FT );    
 ////    igl::readOFF( mesh_to_load , VT, FT );
 
     Segmentation::Segments seg;
@@ -105,6 +105,7 @@ int main(int argc, char *argv[]){
     Segmentation::joinSegments( seg, VT, FT );    
 
     const auto &key_down = [&seg]( igl::viewer::Viewer &viewer, unsigned char key, int mod )->bool{
+        bool convexhull_available = false;
         switch(key)
         {
 
@@ -121,6 +122,7 @@ int main(int argc, char *argv[]){
 #endif
 
             igl::writeOBJ( current_model.mesh_to_save, VH, FH);
+            convexhull_available = true;
             break;
         }
         case 'i':
@@ -135,19 +137,28 @@ int main(int argc, char *argv[]){
         }
         }
 
+        if(convexhull_available){
+            // Use original normals as pseudo-colors
+            MatrixXd N;
+            igl::per_vertex_normals( VH, FH, N );
+            MatrixXd C = N.rowwise().normalized().array()*0.5+0.5;
+            viewer.data.clear();
+            viewer.data.set_mesh( VH, FH );
+        }
+
         return true;
     };
 
 
     // Use original normals as pseudo-colors
     MatrixXd N;
-    igl::per_vertex_normals( VH, FH, N );
+    igl::per_vertex_normals( VT, FT, N );
     std::cout << "normals ok" << std::endl;
 
     MatrixXd C = N.rowwise().normalized().array()*0.5+0.5;
     std::cout << "colors ok" << std::endl;
 
-    viewer.data.set_mesh( VH, FH );
+    viewer.data.set_mesh( VT, FT );
     std::cout << "mesh has been set" << std::endl;
 
 //    setOOBs();

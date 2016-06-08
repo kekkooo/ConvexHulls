@@ -50,7 +50,8 @@ SOURCES += main.cpp \
     convexhullcreator.cpp \
     segmentation.cpp \
     common_paths.cpp \
-    iglconvexhullunion.cpp
+    iglconvexhullunion.cpp \
+    cgal_to_eigen.cpp
 
 HEADERS += \
     convexhullcreator.h \
@@ -58,4 +59,5 @@ HEADERS += \
     segmentation.h \
     commontypedefs.h \
     common_paths.h \
-    iglconvexhullunion.h
+    iglconvexhullunion.h \
+    cgal_to_eigen.h
