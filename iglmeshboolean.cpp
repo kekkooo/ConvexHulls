@@ -92,7 +92,7 @@ void thread_job( const std::vector<Hull>& hulls, std::vector<Hull>& unions, size
                                            hull_b.points, hull_b.faces, igl::MESH_BOOLEAN_TYPE_UNION,
                                            unions[i].points, unions[i].faces, _ );
     }
-    std::cout << "thread " << thread_id << " done" << std::endl;
+//    std::cout << "thread " << thread_id << " done" << std::endl;
 }
 
 void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
@@ -112,55 +112,64 @@ void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segme
         hulls[i].points =  points_vector[i];
         hulls[i].faces  = faces_vector[i];
     }
-
     std::cout << "created hulls list" << std::endl;
 
-    std::sort( hulls.begin(), hulls.end() );
-
-    std::cout << "sorted" << std::endl;
+//    std::sort( hulls.begin(), hulls.end() );
+//    std::cout << "sorted" << std::endl;
 
     bool done = false;
     while( !done ){
         std::cout << "working on #hulls = " << hulls.size()  << std::endl;
         assert( hulls.size() > 1 );
 
+        for( int i = 0; i < hulls.size(); ++i ){
+            std::cout << i << " )" << hulls[i].points.size() << std::endl;
+        }
+        return;
+
         int numPairs = hulls.size() / 2;
 
         unions.clear();
         unions.resize( numPairs );
 
+        // compute the actual number of threads needed and how many pairs must be computed
+        // by each thread. If #pairs < #threads, just use less threads
         int actual_num_threads  = std::min( numPairs, num_threads);
-        int pairs_per_part      = numPairs / actual_num_threads;
+        int pairs_per_thread    = numPairs / actual_num_threads;
         int remainder           = numPairs % actual_num_threads;
+        bool run_mt             = pairs_per_thread >= 1;
+
         std::cout << " num pairs " << numPairs << "remainder " << remainder
-                  << " # no threads" << actual_num_threads << " ppp " << pairs_per_part << std::endl;
-        bool run_mt = pairs_per_part >= 1;
-//        bool run_mt = false;
+                  << " # no threads" << actual_num_threads << " ppp " << pairs_per_thread << std::endl;
+
+        // if a single pair remained, just use the main thread.
         if( run_mt ){
             int last_end = 0;
 
             std::vector< std::thread > threads(actual_num_threads - 1);
+
+            // launch threads with #pairs_per_thread plus an additional pair if it is needed
+            // to consume parts from the remainder.
             for( int i = 0; i < actual_num_threads - 1; ++i ){
                 int start = last_end;
-                last_end = start + pairs_per_part + ( i < remainder ? 1 : 0 );
-                std::cout << "thread " << i << "will process data from " << start << " to " << last_end << std::endl;
+                last_end = start + pairs_per_thread + ( i < remainder ? 1 : 0 );
+
+//                std::cout << "thread " << i << "will process data from " << start << " to " << last_end << std::endl;
 
                 threads[i] = std::thread( thread_job, std::ref(hulls), std::ref( unions ), start, last_end, i );
             }
-            std::cout << "main thread " << "will process data from " << last_end << " to " << numPairs << std::endl;
+//            std::cout << "main thread " << "will process data from " << last_end << " to " << numPairs << std::endl;
             thread_job( hulls, unions, last_end, numPairs, actual_num_threads - 1 );
 
-            //Join parts-1 threads
+            //Join threads
             for ( int i = 0; i < actual_num_threads - 1; ++i ) { threads[i].join(); }
-
-
         }else{
             std::cout << "going single thread " << std::endl;
             thread_job( hulls, unions, 0, numPairs, 0 );
         }
 
-
         std::cout << "created #unions = " << unions.size()  << std::endl;
+        // if the number of hulls is odd, the last one will be added as union by itself
         if( hulls.size() % 2 == 1 ){
             unions.push_back( hulls.back() );
         }
@@ -173,8 +182,7 @@ void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segme
     assert( unions.size() == 1 );
 
     points_out = std::move( unions.back().points );
-    faces_out = std::move( unions.back().faces );
-
+    faces_out = std::move(  unions.back().faces );
 }
 
 }
