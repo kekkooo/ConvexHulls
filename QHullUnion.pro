@@ -28,22 +28,25 @@ INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/CGAL-4.8/DEBUG_BUILD
 INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/mpfr-3.1.3/BUILD109/include
 INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/gmp-6.1.0/BUILD109/include
 INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/libigl/include
+INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/cork/include
 INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/eigen
 INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/glfw-3.1.2/include
 INCLUDEPATH += /Users/francescousai/Documents/Sviluppo/Libs/glfw-3.1.2/src
 
-LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/glfw-3.1.2/BUILD/src -lglfw3
-LIBS        += -framework Cocoa
-LIBS        += -framework OpenGL
-LIBS        += -framework IOKit
-LIBS        += -framework CoreVideo
-LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/boost_1_59_0/BUILD109/lib -lboost_system-mt-s
-LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/boost_1_59_0/BUILD109/lib -lboost_thread-mt-s
-#LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/cgal-releases-CGAL-4.7/BUILD109/lib -lCGAL
-#LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/CGAL-4.8/BUILD/lib -lCGAL
-LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/CGAL-4.8/DEBUG_BUILD/lib -lCGAL
-LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/mpfr-3.1.3/BUILD109/lib -lmpfr
-LIBS        += -L/Users/francescousai/Documents/Sviluppo/Libs/gmp-6.1.0/BUILD109/lib -lgmp
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/glfw-3.1.2/BUILD/src -lglfw3
+LIBS    += -framework Cocoa
+LIBS    += -framework OpenGL
+LIBS    += -framework IOKit
+LIBS    += -framework CoreVideo
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/boost_1_59_0/BUILD109/lib -lboost_system-mt-s
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/boost_1_59_0/BUILD109/lib -lboost_thread-mt-s
+#LIBS   += -L/Users/francescousai/Documents/Sviluppo/Libs/cgal-releases-CGAL-4.7/BUILD109/lib -lCGAL
+#LIBS   += -L/Users/francescousai/Documents/Sviluppo/Libs/CGAL-4.8/BUILD/lib -lCGAL
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/CGAL-4.8/DEBUG_BUILD/lib -lCGAL
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/mpfr-3.1.3/BUILD109/lib -lmpfr
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/gmp-6.1.0/BUILD109/lib -lgmp
+LIBS    += -L/Users/francescousai/Documents/Sviluppo/Libs/cork/lib -lcork
+
 
 
 SOURCES += main.cpp \

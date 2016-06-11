@@ -16,11 +16,30 @@ struct Hull{
     }
 };
 
+enum MeshBoolean{ CGAL, CORK };
+enum MultiThread{ MT, NO_MT };
+
+void getConvexHullUnionWithCGAL(Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
+                                Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out);
+
+void getConvexHullUnionWithCGAL_mt(Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
+                                Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out);
+
+void getConvexHullUnionWithCORK(Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
+                                Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out);
+
+void getConvexHullUnionWithCORK_mt(Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
+                                Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out);
+
+
+void getConvexUnion( Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
+                     Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out, MeshBoolean library, MultiThread mt );
+
 void getConvexHullUnion(Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
-                        Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out);
+                        Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out, MeshBoolean library );
 
 void getConvexHullUnion_mt( Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
-                            Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out);
+                            Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out, MeshBoolean library);
 
 }
 

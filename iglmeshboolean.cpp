@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <igl/copyleft/cgal/mesh_boolean.h>
+#include <igl/copyleft/cork/mesh_boolean.h>
 
 #include<convexhullcreator.h>
 
@@ -14,7 +15,7 @@ namespace iglMeshBoolean{
 static const int num_threads = 4;
 
 void getConvexHullUnion(Eigen::MatrixXd &points_in, const Segmentation::Segments& segments,
-                        Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+                        Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out, MeshBoolean library){
 
     std::vector<Eigen::MatrixXd> points_vector;
     std::vector<Eigen::MatrixXi> faces_vector;
@@ -57,9 +58,20 @@ void getConvexHullUnion(Eigen::MatrixXd &points_in, const Segmentation::Segments
 //                      << "( " << hull_b.points.size() << ", " << hull_b.faces.size() << " )" << std::endl;
             Eigen::VectorXi J;
 
-            igl::copyleft::cgal::mesh_boolean( hull_a.points, hull_a.faces,
-                                               hull_b.points, hull_b.faces, boolean_op,
-                                               unions[i].points, unions[i].faces, J );
+            switch(library){
+                case MeshBoolean::CGAL : {
+                    igl::copyleft::cgal::mesh_boolean( hull_a.points, hull_a.faces,
+                                                       hull_b.points, hull_b.faces, boolean_op,
+                                                       unions[i].points, unions[i].faces, J );
+                    break;
+                }
+                case MeshBoolean::CORK :{
+                    igl::copyleft::cork::mesh_boolean( hull_a.points, hull_a.faces,
+                                                       hull_b.points, hull_b.faces, boolean_op,
+                                                       unions[i].points, unions[i].faces );
+                    break;
+                }
+            }
         }
         std::cout << "created #unions = " << unions.size()  << std::endl;
         if( hulls.size() % 2 == 1 ){
@@ -78,25 +90,35 @@ void getConvexHullUnion(Eigen::MatrixXd &points_in, const Segmentation::Segments
 }
 
 
-void thread_job( const std::vector<Hull>& hulls, std::vector<Hull>& unions, size_t start, size_t end, size_t thread_id ){
+void thread_job_cgal( const std::vector<Hull>& hulls, std::vector<Hull>& unions, size_t start, size_t end, size_t thread_id ){
     for( int i = start; i < end; ++i ){
         size_t hull_index  = i * 2;
         const Hull& hull_a = hulls.at( hull_index );
         const Hull& hull_b = hulls.at( hull_index+1 );
-//        std::cout << "T" << thread_id << " ) working on hulls " << i << " and " << i + 1 << std::endl;
-//        std::cout << "( " << hull_a.points.size() << ", " << hull_a.faces.size() << " )" << std::endl
-//                  << "( " << hull_b.points.size() << ", " << hull_b.faces.size() << " )" << std::endl;
+
         Eigen::VectorXi _;
 
         igl::copyleft::cgal::mesh_boolean( hull_a.points, hull_a.faces,
                                            hull_b.points, hull_b.faces, igl::MESH_BOOLEAN_TYPE_UNION,
                                            unions[i].points, unions[i].faces, _ );
     }
-//    std::cout << "thread " << thread_id << " done" << std::endl;
+}
+
+void thread_job_cork( const std::vector<Hull>& hulls, std::vector<Hull>& unions, size_t start, size_t end, size_t thread_id ){
+    for( int i = start; i < end; ++i ){
+        size_t hull_index  = i * 2;
+        const Hull& hull_a = hulls.at( hull_index );
+        const Hull& hull_b = hulls.at( hull_index+1 );
+
+
+        igl::copyleft::cork::mesh_boolean( hull_a.points, hull_a.faces,
+                                           hull_b.points, hull_b.faces, igl::MESH_BOOLEAN_TYPE_UNION,
+                                           unions[i].points, unions[i].faces );
+    }
 }
 
 void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
-                           Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+                           Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out, MeshBoolean library){
     std::vector<Eigen::MatrixXd> points_vector;
     std::vector<Eigen::MatrixXi> faces_vector;
     std::vector<Hull> hulls, unions;
@@ -121,11 +143,6 @@ void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segme
     while( !done ){
         std::cout << "working on #hulls = " << hulls.size()  << std::endl;
         assert( hulls.size() > 1 );
-
-        for( int i = 0; i < hulls.size(); ++i ){
-            std::cout << i << " )" << hulls[i].points.size() << std::endl;
-        }
-        return;
 
         int numPairs = hulls.size() / 2;
 
@@ -155,17 +172,44 @@ void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segme
                 last_end = start + pairs_per_thread + ( i < remainder ? 1 : 0 );
 
 //                std::cout << "thread " << i << "will process data from " << start << " to " << last_end << std::endl;
+                switch(library){
+                    case MeshBoolean::CGAL : {
+                        threads[i] = std::thread( thread_job_cgal, std::ref(hulls), std::ref( unions ), start, last_end, i );
+                        break;
+                    }
+                    case MeshBoolean::CORK : {
+                        threads[i] = std::thread( thread_job_cork, std::ref(hulls), std::ref( unions ), start, last_end, i );
+                        break;
+                    }
+                }
 
-                threads[i] = std::thread( thread_job, std::ref(hulls), std::ref( unions ), start, last_end, i );
             }
 //            std::cout << "main thread " << "will process data from " << last_end << " to " << numPairs << std::endl;
-            thread_job( hulls, unions, last_end, numPairs, actual_num_threads - 1 );
+            switch(library){
+                case MeshBoolean::CGAL : {
+                    thread_job_cgal( hulls, unions, last_end, numPairs, actual_num_threads - 1 );
+                    break;
+                }
+                case MeshBoolean::CORK : {
+                    thread_job_cork( hulls, unions, last_end, numPairs, actual_num_threads - 1 );
+                    break;
+                }
+            }
 
             //Join threads
             for ( int i = 0; i < actual_num_threads - 1; ++i ) { threads[i].join(); }
         }else{
             std::cout << "going single thread " << std::endl;
-            thread_job( hulls, unions, 0, numPairs, 0 );
+            switch(library){
+                case MeshBoolean::CGAL : {
+                    thread_job_cgal( hulls, unions, 0, numPairs, 0 );
+                    break;
+                }
+                case MeshBoolean::CORK : {
+                    thread_job_cork( hulls, unions, 0, numPairs, 0 );
+                    break;
+                }
+            }
         }
 
         std::cout << "created #unions = " << unions.size()  << std::endl;
@@ -183,6 +227,41 @@ void getConvexHullUnion_mt(Eigen::MatrixXd &points_in, const Segmentation::Segme
 
     points_out = std::move( unions.back().points );
     faces_out = std::move(  unions.back().faces );
+}
+
+void getConvexUnion(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                    Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out, MeshBoolean library, MultiThread mt){
+
+    switch(mt){
+    case MultiThread::MT : {
+        getConvexHullUnion_mt( points_in, segments, points_out, faces_out, library );
+        break;
+    }
+    case MultiThread::NO_MT : {
+        getConvexHullUnion( points_in, segments, points_out, faces_out, library );
+        break;
+    }
+    }
+}
+
+void getConvexHullUnionWithCGAL(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                                Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+    getConvexUnion(points_in, segments, points_out, faces_out, MeshBoolean::CGAL, MultiThread::NO_MT );
+}
+
+void getConvexHullUnionWithCGAL_mt(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                                   Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+    getConvexUnion(points_in, segments, points_out, faces_out, MeshBoolean::CGAL, MultiThread::MT );
+}
+
+void getConvexHullUnionWithCORK(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                                Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+    getConvexUnion(points_in, segments, points_out, faces_out, MeshBoolean::CORK, MultiThread::NO_MT );
+}
+
+void getConvexHullUnionWithCORK_mt(Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
+                                   Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
+    getConvexUnion(points_in, segments, points_out, faces_out, MeshBoolean::CORK, MultiThread::MT );
 }
 
 }

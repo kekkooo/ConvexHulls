@@ -23,6 +23,7 @@
 #include <igl/principal_curvature.h>
 #include <igl/doublearea.h>
 #include <igl/copyleft/cgal/CSGTree.h>
+#include <igl/signed_distance.h>
 
 #include <convexhullcreator.h>
 #include <segmentation.h>
@@ -45,7 +46,7 @@ Eigen::MatrixXi FH;
 // OOBs
 Eigen::MatrixXd VO;
 Eigen::MatrixXi FO;
-Eigen::MatrixXd PQC0, PQC1, PQC2, PQC3; // quad edges
+Eigen::MatrixXd PQC0, PQC1, PQC2; // quad edges
 
 igl::viewer::Viewer viewer;
 
@@ -80,16 +81,17 @@ void saveParts( const Segmentation::Segments& seg ){
     }
 }
 
-void setOOBs( ){
-    // Add edges of the Oriented Bounding Box
-    igl::slice( VO, FO.col(0).eval(), 1, PQC0); igl::slice( VO, FO.col(1).eval(), 1, PQC1);
-    igl::slice( VO, FO.col(2).eval(), 1, PQC2); igl::slice( VO, FO.col(3).eval(), 1, PQC3);
+//void setOOBs( ){
+//    // Add edges of the Oriented Bounding Box
+//    igl::slice( VO, FO.col(0).eval(), 1, PQC0);
+//    igl::slice( VO, FO.col(1).eval(), 1, PQC1);
+//    igl::slice( VO, FO.col(2).eval(), 1, PQC2);
 
-    viewer.data.add_edges( PQC0, PQC1, Eigen::RowVector3d( 0, 0, 0 ));
-    viewer.data.add_edges( PQC1, PQC2, Eigen::RowVector3d( 0, 0, 0 ));
-    viewer.data.add_edges( PQC2, PQC3, Eigen::RowVector3d( 0, 0, 0 ));
-    viewer.data.add_edges( PQC3, PQC0, Eigen::RowVector3d( 0, 0, 0 ));
-}
+//    viewer.data.add_edges( PQC0, PQC1, Eigen::RowVector3d( 0, 0, 0 ));
+//    viewer.data.add_edges( PQC1, PQC2, Eigen::RowVector3d( 0, 0, 0 ));
+//    viewer.data.add_edges( PQC2, PQC3, Eigen::RowVector3d( 0, 0, 0 ));
+//    viewer.data.add_edges( PQC3, PQC0, Eigen::RowVector3d( 0, 0, 0 ));
+//}
 
 int main(int argc, char *argv[]){
 
@@ -131,8 +133,8 @@ int main(int argc, char *argv[]){
             std::cout << "IGL::mesh_boolean approach" << std::endl;
             auto t0 = myclock::now();
 
-            //iglMeshBoolean::getConvexHullUnion(VT, seg, VH, FH );
-            iglMeshBoolean::getConvexHullUnion_mt(VT, seg, VH, FH );
+//            iglMeshBoolean::getConvexHullUnion_mt(VT, seg, VH, FH );
+            iglMeshBoolean::getConvexHullUnionWithCGAL_mt(VT, seg, VH, FH);
 
             auto t1  = myclock::now();
             long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
@@ -151,17 +153,39 @@ int main(int argc, char *argv[]){
         case 'k':
         case 'K':{
             std::cout << "IGL::Cork approach" << std::endl;
+            auto t0 = myclock::now();
+
+            iglMeshBoolean::getConvexHullUnionWithCORK( VT, seg, VH, FH );
+
+            auto t1  = myclock::now();
+            long span = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+            std::cout << "whole process took " << span << "millis" << std::endl;
+
+            igl::writeOBJ( current_model.mesh_to_save, VH, FH);
+            convexhull_available = true;
             break;
         }
         }
 
-        if(convexhull_available){
-            // Use original normals as pseudo-colors
-            MatrixXd N;
-            igl::per_vertex_normals( VH, FH, N );
-            MatrixXd C = N.rowwise().normalized().array()*0.5+0.5;
-            viewer.data.clear();
-            viewer.data.set_mesh( VH, FH );
+        if(convexhull_available){            
+
+//            Eigen::VectorXd S;
+//            Eigen::VectorXi I;
+//            Eigen::MatrixXd C, N;
+//            Eigen::MatrixXd Colors;
+//            igl::signed_distance( VT, VH, FH, igl::SIGNED_DISTANCE_TYPE_WINDING_NUMBER, S, I, C, N );
+//            std::cout << "distance computed" << std::endl;
+//            // Compute per-vertex colors
+//            igl::jet( S, true, Colors );
+//            viewer.data.clear();
+//            viewer.data.set_mesh( C, FT );
+//            viewer.data.set_colors( Colors );
+            igl::slice( VH, FH.col(0).eval(), 1, PQC0 );
+            igl::slice( VH, FH.col(1).eval(), 1, PQC1 );
+            igl::slice( VH, FH.col(2).eval(), 1, PQC2 );
+            viewer.data.add_edges(PQC0, PQC1, Eigen::RowVector3d(0,0,0));
+            viewer.data.add_edges(PQC1, PQC2, Eigen::RowVector3d(0,0,0));
+            viewer.data.add_edges(PQC1, PQC0, Eigen::RowVector3d(0,0,0));
         }
 
         return true;

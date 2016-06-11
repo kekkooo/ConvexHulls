@@ -5,8 +5,8 @@
 
 namespace CSGTree{
 
-    void getConvexHullUnion( Eigen::MatrixXd& points_in, Eigen::MatrixXi& faces_in,
-                             Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out);
+    void getConvexHullUnion(Eigen::MatrixXd& points_in, const Segmentation::Segments &segments,
+                             Eigen::MatrixXd& points_out, Eigen::MatrixXi& faces_out );
 
 }
 
