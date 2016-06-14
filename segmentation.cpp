@@ -2,47 +2,71 @@
 #include <iostream>
 #include <fstream>
 
+namespace Segmentation {
 
-void Segmentation::buildSegmentedPointsList( Eigen::MatrixXd &points_in, const Segmentation::Segments &segments,
-                                             Segmentation::SegmentedPointList &segmentedPointList){
+void buildSegmentedPointsList( Eigen::MatrixXd &points_in, const Segments &segments,
+                                             SegmentedPointList &segmentedPointList){
     for( const auto& item : segments ){
         std::vector<CGAL_Point_3> points;
         for( size_t i : item.second ){
-            std::cout << "adding point " << i;
+            ////std::cout << "adding point " << i;
             points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
-    //            std::cout << " = " << points.back() << std::endl;
+    //            //std::cout << " = " << points.back() << std::endl;
         }
         segmentedPointList[item.first] = std::move( points );
     }
 }
 
-void Segmentation::loadSegments( std::string filename, Segmentation::Segments &segments){
+
+
+
+void loadSegments( std::string filename, Segments& segments, const Eigen::MatrixXi& f ) {
     segments.clear();
     std::ifstream infile( filename.c_str() );
-    assert( infile.good());
+    assert( infile.good() );
 
     std::string header, kind;
     size_t num_verts, num_segments, vid, segid;
 
-    infile  >> header;
-    assert( std::strcmp( header.c_str(), "SEGMENT" ) == 0);
+    // Read file from animation data. The file format has an header and then VID and SegID
+    if( f.rows() == 0 ) {
+        infile  >> header;
+        assert( std::strcmp( header.c_str(), "SEGMENT" ) == 0);
 
-    infile >> num_verts >> num_segments;
-    infile >> kind;
-    std::cout << header << "   " << kind << std::endl;
-    assert( std::strcmp( kind.c_str(), "MAX" ) == 0);
-    std::cout << "there are " << num_verts << " vertices ";
-    while( infile >> vid >> segid ){
-        if( segments.count(segid) == 0 ){
-            segments[segid] = std::set<size_t>();
+        infile >> num_verts >> num_segments;
+        infile >> kind;
+        //std::cout << header << "   " << kind << std::endl;
+        assert( std::strcmp( kind.c_str(), "MAX" ) == 0);
+        //std::cout << "there are " << num_verts << " vertices ";
+        while( infile >> vid >> segid ){
+            if( segments.count(segid) == 0 ){
+                segments[segid] = std::set<size_t>();
+            }
+            segments[segid].insert( vid );
+            ////std::cout << vid << " " << segid << std::endl;
         }
-        segments[segid].insert( vid );
-        std::cout << vid << " " << segid << std::endl;
+    } else {
+        // Read file from Princeton Dataset. The file format has f.size() rows with just SegID.
+        const uint size = f.rows();
+
+        for( uint i = 0; i < size; ++i ) {
+            infile >> segid;
+            if( segments.count(segid) == 0 ){
+                segments[segid] = std::set<size_t>();
+            }
+            for( uint j = 0; j < f.cols(); ++j ) {
+                segments[segid].insert( f( i, j ) );
+            }
+        }
+
     }
     infile.close();
 }
 
-void Segmentation::joinSegments(Segmentation::Segments &segments, Eigen::MatrixXd &v, Eigen::MatrixXi &f){
+
+
+
+void joinSegments(Segments &segments, Eigen::MatrixXd &v, Eigen::MatrixXi &f ){
     // for each vertex, if all its neighbors belong to the same segment
     Segments to_add;
     std::vector<int> vert_to_segment( v.rows(), -1 );
@@ -50,12 +74,12 @@ void Segmentation::joinSegments(Segmentation::Segments &segments, Eigen::MatrixX
     // create vertex to segment correspondance
     for( const auto&  item : segments ){
         for( size_t vid : item.second ){
-            std::cout << "vertex " << vid << " maps to segment " << item.first << std::endl;
+            ////std::cout << "vertex " << vid << " maps to segment " << item.first << std::endl;
             vert_to_segment[vid] = item.first;
         }
     }
 
-//    std::cout << f;
+//    //std::cout << f;
 
     for( int i = 0; i < f.rows(); ++i ){
         // make kocho happy,
@@ -92,3 +116,5 @@ void Segmentation::joinSegments(Segmentation::Segments &segments, Eigen::MatrixX
     }
 
 }
+
+} // namespace Segmentation

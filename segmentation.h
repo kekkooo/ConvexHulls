@@ -1,8 +1,8 @@
 #ifndef SEGMENTATION_H
 #define SEGMENTATION_H
 
-#include<string>
-#include <Eigen/Dense>
+#include <string>
+#include <eigen3/Eigen/Dense>
 #include <commontypedefs.h>
 
 namespace Segmentation
@@ -11,7 +11,7 @@ namespace Segmentation
     typedef std::map< size_t, std::vector<CGAL_Point_3> >               SegmentedPointList;
 
     void buildSegmentedPointsList(Eigen::MatrixXd &points_in, const Segments& segments, SegmentedPointList& segmentedPointList );
-    void loadSegments( std::string filename, Segments& segments );
+    void loadSegments( std::string filename, Segments& segments, const Eigen::MatrixXi& f );
     void joinSegments( Segments& segments, Eigen::MatrixXd& v, Eigen::MatrixXi& f );
 
 }

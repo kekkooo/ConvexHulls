@@ -128,49 +128,64 @@ void ConvexHullCreator::getConvexHull( Eigen::MatrixXd &points_in, const Segment
     std::cout << "all process took " << span << "millis" << std::endl;
 }
 
+
+
+
+
+
+
+
+
+
 void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Segmentation::Segments &s,
                                             Eigen::MatrixXd &points_out, Eigen::MatrixXi &faces_out){
     auto t0 = myclock::now();
 
     size_t no_segments = s.size();
     std::vector<Polyhedron_3_no_id>                 hulls( no_segments );
-    std::vector<Nef_Polyhedron_3>                   nef_hulls;
+    //std::vector<Nef_Polyhedron_3>                   nef_hulls;
+    std::vector<Nef_Polyhedron_3>                   nef_hulls( no_segments, Nef_Polyhedron_3::EMPTY );
     std::map< size_t, std::vector<CGAL_Point_3> >   seg_points;
     std::vector<CGAL_Point_3>                       points( points_in.rows( ));
 
 
     // build the segmented list of points
-    for( const auto& item : s ){
-        std::vector<CGAL_Point_3> points;
-        for( size_t i : item.second ){
-//            std::cout << "adding point " << i;
-            points.push_back( CGAL_Point_3( points_in( i, 0 ), points_in( i, 1 ), points_in( i, 2 )));
-//            std::cout << " = " << points.back() << std::endl;
-        }
-        seg_points[item.first] = std::move( points );
-    }
+    Segmentation::buildSegmentedPointsList( points_in, s, seg_points );
+    uint size = seg_points.size();
 
     auto ta0 = myclock::now();
     // build the convex_hulls
-    for( const auto& item : seg_points ){
-        auto ta = myclock::now();
-        std::cout << "building convex hull for segment " << item.first << std::endl;
-        const auto& points = item.second;
-        std::cout << "with " << points.size() << " points " << std::endl;
-        Polyhedron_3_no_id hull;
-        CGAL::convex_hull_3( points.begin(), points.end(), hull );
-
-        if( hull.is_closed() ){
-//            Nef_Polyhedron_3 nef_hull(Nef_Polyhedron_3::EMPTY);
-            hulls.push_back( hull );
-            Nef_Polyhedron_3 nef_hull( hull );
-            nef_hulls.push_back( nef_hull );
+    //#pragma omp parallel for
+    for( uint i = 0; i < size; ++i ) {
+        auto item = seg_points.cbegin();
+        for( uint j = 0; j < i; ++j ) {
+            ++item;
         }
 
-        auto tb  = myclock::now();
-        long ab = std::chrono::duration_cast<std::chrono::milliseconds>(tb - ta).count();
-        std::cout << "took " << ab << "millis" << std::endl;
+        const auto& points = item->second;
+        Polyhedron_3_no_id hull;
+        CGAL::convex_hull_3( points.begin(), points.end(), hull );
+        hulls[i] = hull;
+        Nef_Polyhedron_3 nef_hull( hull );
+        nef_hulls[i] = nef_hull;
     }
+
+//    for( const auto& item : seg_points ){
+//        auto ta = myclock::now();
+//        std::cout << "building convex hull for segment " << item.first << std::endl;
+//        const auto& points = item.second;
+//        std::cout << "with " << points.size() << " points " << std::endl;
+//        Polyhedron_3_no_id hull;
+//        CGAL::convex_hull_3( points.begin(), points.end(), hull );
+
+//        hulls.push_back( hull );
+//        Nef_Polyhedron_3 nef_hull( hull );
+//        nef_hulls.push_back( nef_hull );
+
+//        auto tb  = myclock::now();
+//        long ab = std::chrono::duration_cast<std::chrono::milliseconds>(tb - ta).count();
+//        std::cout << "took " << ab << "millis" << std::endl;
+//    }
     auto tb0  = myclock::now();
     long ab0 = std::chrono::duration_cast<std::chrono::milliseconds>(tb0 - ta0).count();
     std::cout << "Computation of all convex hulls took " << ab0 << "millis" << std::endl;
@@ -183,17 +198,42 @@ void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Se
     Nef_Polyhedron_3 nef_union( Nef_Polyhedron_3::EMPTY );
 
 
-    size_t iter = 0;
-    for( auto& nh : nef_hulls ) {
-        auto ta = myclock::now();
+    auto ta = myclock::now();
 
-        nef_union = nef_union + nh;
 
-        auto tb  = myclock::now();
-        long ab = std::chrono::duration_cast<std::chrono::milliseconds>(tb - ta).count();
-        std::cout << "union " << iter++ << "done in "  << ab << "millis" << std::endl;
-
+    std::cout << "\n==== START UNION ====" << std::endl;
+    std::vector< Nef_Polyhedron_3 > ch = nef_hulls;
+    assert( ch.size() > 1 && " Just one Convex Hull " );
+    uint res_size = ( ch.size() / 2 ) + ( ch.size() % 2 );
+    std::vector< Nef_Polyhedron_3 > result( res_size, Nef_Polyhedron_3::EMPTY );
+    while( res_size > 1 ) {
+        const uint ch_size = ch.size();
+        //#pragma omp parallel for
+        for( uint j = 0; j < res_size; ++j ) {
+            uint i = j * 2;
+            if( i == ( ch_size - 1 ) ) {
+                result[j] = ( ch[i] );
+            } else {
+                result[j] = ( ch[i] + ch[i+1] );
+            }
+        }
+        std::swap( ch, result );
+        res_size = ( ch.size() / 2 ) + ( ch.size() % 2 );
+        result.resize( res_size );
     }
+    result[0] = ch[0] + ch[1];
+    std::cout << "==== END UNION ====\n" << std::endl;
+
+//    size_t iter = 0;
+//    for( auto& nh : nef_hulls ) {
+//        nef_union = nef_union + nh;
+//    }
+
+    auto tb  = myclock::now();
+    long ab = std::chrono::duration_cast<std::chrono::milliseconds>(tb - ta).count();
+    std::cout << "union done in "  << ab << "millis" << std::endl;
+
+    nef_union = result[0];
     nef_union.convert_to_Polyhedron( exact_convex_union );
 
     toInexactPolyhedron( exact_convex_union, convex_union );
@@ -232,6 +272,17 @@ void ConvexHullCreator::getConvexHullUnion( Eigen::MatrixXd &points_in, const Se
     std::cout << "all process took " << span << "millis" << std::endl;
 
 }
+
+
+
+
+
+
+
+
+
+
+
 
 void ConvexHullCreator::remesh(Double_Polyhedron_3& in ){
 

@@ -1,7 +1,7 @@
 #ifndef CONVEXHULLCREATOR_H
 #define CONVEXHULLCREATOR_H
 
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 //#include <CGAL/Exact_integer.h>
 //#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 //#include <CGAL/Exact_predicates_exact_constructions_kernel.h>

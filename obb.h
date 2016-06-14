@@ -1,7 +1,7 @@
 #ifndef OBB_H
 #define OBB_H
 
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 namespace OBB{
 

@@ -1,8 +1,8 @@
 #include "obb.h"
 #include <iostream>
-#include <Eigen/SVD>
-#include <Eigen/QR>
-#include <Eigen/OrderingMethods>
+#include <eigen3/Eigen/SVD>
+#include <eigen3/Eigen/QR>
+#include <eigen3/Eigen/OrderingMethods>
 
 void OBB::buildOBB(Eigen::MatrixXd &V, Eigen::MatrixXi &F, Eigen::MatrixXd& obbV, Eigen::MatrixXi& obbF){
     std::cout << "trying to build oob" << std::endl;
